@@ -16,7 +16,25 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Detect changed projects
+      id: changes
+      run: |
+        CHANGED_PROJECTS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^projects/' | cut -d'/' -f2 | sort | uniq)
+        echo "Changed projects: $CHANGED_PROJECTS"
+        echo "::set-output name=projects::$CHANGED_PROJECTS"
+
+    - name: Build and Test
+      run: |
+        for project in ${{ steps.changes.outputs.projects }}; do
+          if [ -f "projects/$project/Cargo.toml" ]; then
+            echo "Building and testing project in projects/$project"
+            (cd "projects/$project" && cargo build --verbose && cargo test --verbose)
+          fi
+        done
+      if: steps.changes.outputs.projects != ''
